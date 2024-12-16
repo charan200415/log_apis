@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+    <html>
+    <head>
+      <title>Real-Time Logs</title>
+      <style>
+        body {
+          font-family: sans-serif;
+          margin: 20px;
+          background-color: #f4f4f4;
+          color: #333;
+        }
+        h1 {
+          text-align: center;
+          margin-bottom: 20px;
+          color: #0056b3;
+        }
+        #logs {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+          gap: 20px;
+          padding: 20px;
+          max-height: 600px;
+          overflow-y: auto;
+        }
+        .log-entry {
+          background-color: #fff;
+          border-radius: 8px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          padding: 15px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        }
+        .log-header {
+          display: flex;
+          align-items: center;
+          margin-bottom: 10px;
+        }
+        .log-timestamp {
+          font-size: 0.8em;
+          color: #888;
+          margin-right: 10px;
+        }
+        .log-method {
+          font-weight: bold;
+          margin-right: 5px;
+          padding: 4px 8px;
+          border-radius: 4px;
+          color: white;
+        }
+        .log-method.GET { background-color: #28a745; }
+        .log-method.POST { background-color: #007bff; }
+        .log-method.PUT { background-color: #ffc107; color: #212529; }
+        .log-method.DELETE { background-color: #dc3545; }
+        .log-url {
+          font-style: italic;
+          flex-grow: 1;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .log-body {
+          margin-top: 10px;
+          font-size: 0.9em;
+          overflow-x: auto;
+          white-space: pre-wrap;
+          background-color: #f9f9f9;
+          padding: 10px;
+          border-radius: 4px;
+        }
+        #api-guide {
+          margin-top: 30px;
+          padding: 20px;
+          background-color: #fff;
+          border-radius: 8px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          display: none; /* Initially hidden */
+        }
+        #show-guide {
+          margin-top: 10px;
+          padding: 10px 20px;
+          background-color: #007bff;
+          color: white;
+          border: none;
+          border-radius: 5px;
+          cursor: pointer;
+        }
+      </style>
+    </head>
+    <body>
+      <h1>Real-Time Logs</h1>
+      <div id="logs"></div>
+
+      <button id="show-guide">Show API Usage Guide</button>
+
+      <div id="api-guide">
+        <h2>How to Use the API</h2>
+        <p>This API forwards requests to a FastAPI endpoint.  The required field is "query".  "stream" and "model_name" are optional.</p>
+        <h3>Request Structure (JSON):</h3>
+        <pre><code>
+{
+  "method": "POST",
+  "url": "/api/test",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "query": "Your query here",
+    "stream": true,  // Optional: true for streaming response
+    "model_name": "google/gemma-1.1-2b-it" // Optional: Model name
+  }
+}
+        </code></pre>
+        <h3>Example using curl:</h3>
+        <pre><code>
+curl -X POST \
+  http://localhost:3000/api \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "method": "POST",
+    "url": "/api/test",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "query": "Your query here",
+      "stream": true,
+      "model_name": "google/gemma-1.1-2b-it"
+    }
+  }'
+        </code></pre>
+        <h3>Example using JavaScript fetch:</h3>
+        <pre><code>
+// See JavaScript code in the script section below
+        </code></pre>
+        <h3>Instructions for different operating systems:</h3>
+        <ul>
+          <li><b>Linux:</b> Use the curl command as shown above in your terminal.</li>
+          <li><b>Windows:</b> Open your command prompt or PowerShell and use the curl command as shown above.</li>
+          <li><b>macOS:</b> Open your terminal and use the curl command as shown above.</li>
+        </ul>
+      </div>
+       <h2>Stream Output</h2>
+      <div id="stream-output"></div>
+      <script>
+        const logsDiv = document.getElementById('logs');
+        const socket = new WebSocket('ws://localhost:3000');
+        const streamOutputDiv = document.getElementById('stream-output');
+        const showGuideButton = document.getElementById('show-guide');
+        const apiGuideDiv = document.getElementById('api-guide');
+
+        showGuideButton.addEventListener('click', () => {
+          apiGuideDiv.style.display = apiGuideDiv.style.display === 'none' ? 'block' : 'none';
+        });
+
+        socket.onopen = () => {
+          console.log('WebSocket connection established');
+        };
+
+        socket.onmessage = event => {
+          const data = JSON.parse(event.data);
+
+          if (data.type === 'initialLogs') {
+            data.logs.forEach(log => addLogEntry(log));
+          } else if (data.type === 'log') {
+            addLogEntry(data.log);
+          }
+        };
+
+        socket.onerror = error => {
+          console.error('WebSocket error:', error);
+        };
+
+        function addLogEntry(log) {
+          const logEntryDiv = document.createElement('div');
+          logEntryDiv.classList.add('log-entry');
+
+          const logHeaderDiv = document.createElement('div');
+          logHeaderDiv.classList.add('log-header');
+
+          const timestampSpan = document.createElement('span');
+          timestampSpan.classList.add('log-timestamp');
+          timestampSpan.textContent = log.timestamp;
+
+          const methodSpan = document.createElement('span');
+          methodSpan.classList.add('log-method');
+          methodSpan.classList.add(log.method);
+          methodSpan.textContent = log.method;
+
+          const urlSpan = document.createElement('span');
+          urlSpan.classList.add('log-url');
+          urlSpan.textContent = log.url;
+
+          logHeaderDiv.appendChild(timestampSpan);
+          logHeaderDiv.appendChild(methodSpan);
+          logHeaderDiv.appendChild(urlSpan);
+
+          const bodyPre = document.createElement('pre');
+          bodyPre.classList.add('log-body');
+          bodyPre.textContent = JSON.stringify(log.body, null, 2);
+
+          logEntryDiv.appendChild(logHeaderDiv);
+          logEntryDiv.appendChild(bodyPre);
+
+          logsDiv.appendChild(logEntryDiv);
+        }
+
+        async function sendApiRequest() {
+          streamOutputDiv.textContent = '';
+          const response = await fetch('http://localhost:3000/api', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              method: 'POST',
+              url: '/api/test',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: {
+                query: 'Tell me a joke',
+                stream: true,
+                model_name: 'google/gemma-1.1-2b-it'
+              }
+            }),
+          });
+          if (response.body) {
+            const reader = response.body.getReader();
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) {
+                break;
+              }
+              const text = new TextDecoder().decode(value);
+              streamOutputDiv.textContent += text;
+            }
+          }
+        }
+        sendApiRequest();
+      </script>
+    </body>
+    </html>
